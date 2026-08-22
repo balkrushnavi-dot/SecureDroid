@@ -17,6 +17,7 @@ class SecureDroidPlugin : Plugin() {
     private lateinit var biometricManagerHelper: BiometricManagerHelper
     private lateinit var cameraManagerHelper: CameraManagerHelper
     private lateinit var permissionManagerHelper: PermissionManagerHelper
+    private lateinit var appManagerHelper: AppManagerHelper
 
     override fun load() {
         deviceInfoManager = DeviceInfoManager(context)
@@ -27,6 +28,7 @@ class SecureDroidPlugin : Plugin() {
         biometricManagerHelper = BiometricManagerHelper(context)
         cameraManagerHelper = CameraManagerHelper(context)
         permissionManagerHelper = PermissionManagerHelper(context)
+        appManagerHelper = AppManagerHelper(context)
     }
 
     @PluginMethod
@@ -74,6 +76,23 @@ class SecureDroidPlugin : Plugin() {
     @PluginMethod
     fun getAppPermissions(call: PluginCall) {
         try { call.resolve(permissionManagerHelper.getAppPermissionStatus()) } 
+        catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
+    }
+
+    @PluginMethod
+    fun getInstalledApps(call: PluginCall) {
+        try { call.resolve(appManagerHelper.getInstalledLaunchableApps()) }
+        catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
+    }
+
+    @PluginMethod
+    fun launchApp(call: PluginCall) {
+        val packageName = call.getString("packageName")
+        if (packageName.isNullOrBlank()) {
+            call.resolve(JSObject().put("success", false).put("message", "Package name is required"))
+            return
+        }
+        try { call.resolve(appManagerHelper.launchApp(packageName)) }
         catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
     }
 }
