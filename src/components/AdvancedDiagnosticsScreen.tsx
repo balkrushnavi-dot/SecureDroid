@@ -1,80 +1,46 @@
-import React, { useState } from 'react';
-import {
-  Terminal,
-  Cpu,
-  Shield,
-  Layers,
-  Search,
-  Filter,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  HelpCircle,
-  HardDrive,
-  Key,
-  Globe,
-  Lock,
-  ChevronDown,
-  ChevronRight,
-  Info,
-  ExternalLink,
-  Code,
-  Sparkles
-} from 'lucide-react';
-import {
-  SecureDroidTopBar,
-  SecureDroidCard,
-  SecureDroidSectionHeader,
-  SecureDroidStatusChip,
-  SecureDroidButton
-} from './ui/designSystem';
-import {
-  CapabilityCategory,
-  CapabilityItem,
-  DeviceProfile,
-  SystemLayer,
-  SystemScreen
-} from '../types/securedroid';
-import { ARCHITECTURE_REGISTRY, OS_LAYERS, SYSTEM_SERVICES } from '../data/osArchitectureData';
-import { CapabilityDetailModal } from './CapabilityDetailModal';
+import React, { useEffect, useState } from 'react';
+import { SecureDroidNative } from '../services/native/SecureDroidNative';
 
-interface AdvancedDiagnosticsScreenProps {
-  profile: DeviceProfile;
-  capabilities: CapabilityItem[];
-  onBack?: () => void;
-  onNavigate?: (screen: SystemScreen) => void;
-  isLight?: boolean;
-}
-
-type TabType = 'CAPABILITIES' | 'ARCHITECTURE' | 'SERVICES' | 'POCO_GUIDE';
-
-export const AdvancedDiagnosticsScreen: React.FC<AdvancedDiagnosticsScreenProps> = ({
-  profile,
-  capabilities,
-  onBack,
-  onNavigate,
-  isLight = false,
-}) => {
-  const [activeTab, setActiveTab] = useState<TabType>('CAPABILITIES');
-  const [selectedCategory, setSelectedCategory] = useState<CapabilityCategory | 'ALL'>('ALL');
-  const [selectedLayer, setSelectedLayer] = useState<SystemLayer | 'ALL'>('ALL');
-  const [expandedCapId, setExpandedCapId] = useState<string | null>(null);
-  const [inspectCapability, setInspectCapability] = useState<CapabilityItem | null>(null);
-
-  const filteredCapabilities = capabilities.filter((cap) => {
-    if (selectedCategory === 'ALL') return true;
-    return cap.category === selectedCategory;
+// Inside your AdvancedDiagnosticsScreen component, add this state & effect:
+export function AdvancedDiagnosticsScreen({ profile, capabilities, onBack, onNavigate, isLight }: any) {
+  const [nativeData, setNativeData] = useState({
+    sensors: null as any,
+    camera: null as any,
+    permissions: null as any,
+    storage: null as any,
+    network: null as any,
+    loading: true
   });
 
-  const filteredArchitecture = ARCHITECTURE_REGISTRY.filter((entry) => {
-    if (selectedLayer === 'ALL') return true;
-    return entry.layer === selectedLayer;
-  });
+  useEffect(() => {
+    async function fetchAllDiagnostics() {
+      try {
+        const [sensors, camera, permissions, storage, network] = await Promise.all([
+          SecureDroidNative.getAvailableSensors().catch(() => null),
+          SecureDroidNative.getCameraStatus().catch(() => null),
+          SecureDroidNative.getAppPermissions().catch(() => null),
+          SecureDroidNative.getStorageState().catch(() => null),
+          SecureDroidNative.getNetworkState().catch(() => null),
+        ]);
 
-  return (
-    <div className={`min-h-full p-4 pb-24 ${isLight ? 'bg-zinc-50 text-zinc-900' : 'bg-zinc-950 text-zinc-100'}`}>
-      <SecureDroidTopBar
-        title="Advanced Diagnostics"
+        setNativeData({
+          sensors: sensors?.data || null,
+          camera: camera?.data || null,
+          permissions: permissions?.data || null,
+          storage: storage?.data || null,
+          network: network?.data || null,
+          loading: false
+        });
+      } catch (e) {
+        console.warn("Could not fetch native diagnostics");
+        setNativeData(prev => ({ ...prev, loading: false }));
+      }
+    }
+
+    fetchAllDiagnostics();
+  }, []);
+
+  // You can now render nativeData.camera, nativeData.sensors, etc. in your JSX UI!
         subtitle="Level 3 Technical Inspection & Hardware Probes"
         onBack={onBack}
         isLight={isLight}
