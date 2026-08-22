@@ -7,45 +7,82 @@ import android.hardware.camera2.CameraManager
 import com.getcapacitor.JSObject
 
 class CameraManagerHelper(private val context: Context) {
+
     fun getCameraStatus(): JSObject {
         val packageManager = context.packageManager
-        val hasAnyCamera = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
-        val hasFrontCamera = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
-        val hasFlash = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)
 
-        var cameraCount = 0
-        var isBackAvailable = false
+        val hasAnyCamera =
+            packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
 
-        if (hasAnyCamera) {
-            try {
-                val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-                val cameraIdList = cameraManager.cameraIdList
-                cameraCount = cameraIdList.size
+        val hasFrontCamera =
+            packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
 
-                for (id in cameraIdList) {
-                    val characteristics = cameraManager.getCameraCharacteristics(id)
-                    val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
-                    if (facing == CameraCharacteristics.LENS_FACING_BACK) {
-                        isBackAvailable = true
-                    }
-                }
-            } catch (e: Exception) {
-                // Fallback to basic package manager query if HAL is busy
-                isBackAvailable = true
+        val hasFlash =
+            packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)
+
+        if (!hasAnyCamera) {
+            return JSObject().apply {
+                put("status", "ok")
+                put("data", JSObject().apply {
+                    put("hasCamera", false)
+                    put("hasFrontCamera", false)
+                    put("hasBackCamera", false)
+                    put("hasFlash", false)
+                    put("cameraCount", 0)
+                })
             }
         }
 
-        val data = JSObject()
-        data.put("hasCamera", hasAnyCamera)
-        data.put("hasFrontCamera", hasFrontCamera)
-        data.put("hasBackCamera", isBackAvailable)
-        data.put("hasFlash", hasFlash)
-        data.put("cameraCount", cameraCount)
+        val cameraManager =
+            context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+                ?: return JSObject().apply {
+                    put("status", "unsupported")
+                    put("errorCode", "NOT_SUPPORTED")
+                    put("message", "CameraManager is unavailable.")
+                }
 
-        val result = JSObject()
-        result.put("success", true)
-        result.put("data", data)
-        return result
+        return try {
+            val cameraIdList = cameraManager.cameraIdList
+
+            var isBackAvailable = false
+
+            for (id in cameraIdList) {
+                val characteristics =
+                    cameraManager.getCameraCharacteristics(id)
+
+                val facing =
+                    characteristics.get(CameraCharacteristics.LENS_FACING)
+
+                if (facing == CameraCharacteristics.LENS_FACING_BACK) {
+                    isBackAvailable = true
+                }
+            }
+
+            JSObject().apply {
+                put("status", "ok")
+                put("data", JSObject().apply {
+                    put("hasCamera", true)
+                    put("hasFrontCamera", hasFrontCamera)
+                    put("hasBackCamera", isBackAvailable)
+                    put("hasFlash", hasFlash)
+                    put("cameraCount", cameraIdList.size)
+                })
+            }
+        } catch (e: SecurityException) {
+            JSObject().apply {
+                put("status", "permission_required")
+                put("errorCode", "PERMISSION_DENIED")
+                put("message", "Camera access was denied by Android.")
+            }
+        } catch (e: Exception) {
+            JSObject().apply {
+                put("status", "error")
+                put("errorCode", "HARDWARE_UNAVAILABLE")
+                put(
+                    "message",
+                    e.localizedMessage ?: "Camera hardware could not be queried."
+                )
+            }
+        }
     }
 }
-
