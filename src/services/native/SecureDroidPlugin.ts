@@ -7,4 +7,3 @@ export interface SecureDroidPlugin {
 }
 
 export const SecureDroidNative = registerPlugin<SecureDroidPlugin>('SecureDroid');
-
