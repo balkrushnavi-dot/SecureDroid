@@ -1,10 +1,6 @@
 name: Build SecureDroid APK
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -19,6 +15,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
         run: npm install
@@ -26,8 +23,18 @@ jobs:
       - name: Build web application
         run: npm run build
 
-      - name: Synchronize Android project
-        # This updates the existing android/ project with your web assets
+      - name: Verify web assets
+        run: |
+          test -f dist/index.html
+          echo "dist/index.html exists"
+
+      - name: Add Android platform if needed
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
+
+      - name: Synchronize Capacitor
         run: npx cap sync android
 
       - name: Setup Java
@@ -36,11 +43,9 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Build APK
+      - name: Build Debug APK
         working-directory: android
-        run: |
-          chmod +x ./gradlew
-          ./gradlew assembleDebug
+        run: ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
