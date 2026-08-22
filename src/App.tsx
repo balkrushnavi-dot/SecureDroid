@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+
 import { SystemStatusBar } from './components/SystemStatusBar';
 import { SystemNavigationBar } from './components/navigation/SystemNavigationBar';
 import { VolumePanel } from './components/system/VolumePanel';
@@ -10,9 +11,9 @@ import { AppDrawerScreen } from './components/launcher/AppDrawerScreen';
 import { RecentAppsScreen } from './components/launcher/RecentAppsScreen';
 import { GlobalSearchScreen } from './components/launcher/GlobalSearchScreen';
 
-// Native Bridge Imports
+// Native Bridge
 import { SecureDroidNative } from './services/native/SecureDroidNative';
-import { RealDeviceInfo, RealBatteryStatus } from './types/native';
+import { RealDeviceInfo } from './types/native';
 
 // Settings Screens
 import {
@@ -22,12 +23,13 @@ import {
   SettingsBatteryScreen,
   SettingsStorageScreen,
   SettingsWallpaperScreen,
-  SettingsAboutScreen
+  SettingsAboutScreen,
 } from './components/settings/SettingsScreens';
+
 import { SettingsNavigationScreen } from './components/settings/SettingsNavigationScreen';
 import { InstallAppScreen } from './components/settings/InstallAppScreen';
 
-// Security & Privacy Screens (Level 2)
+// Security & Privacy Screens
 import { SecurityCenterScreen } from './components/SecurityCenterScreen';
 import { PrivacyCenterScreen } from './components/PrivacyCenterScreen';
 import { PermissionManagerScreen } from './components/PermissionManagerScreen';
@@ -36,10 +38,10 @@ import { SystemUpdatesScreen } from './components/SystemUpdatesScreen';
 import { AppSandboxScreen } from './components/AppSandboxScreen';
 import { AppDetailScreen } from './components/AppDetailScreen';
 
-// Advanced Diagnostics (Level 3)
+// Advanced Diagnostics
 import { AdvancedDiagnosticsScreen } from './components/AdvancedDiagnosticsScreen';
 
-// 31-Point Feature Pack Screens (Level 2 & Deep Security Modules)
+// Security Feature Screens
 import { AdvancedProtectionScreen } from './components/security/AdvancedProtectionScreen';
 import { ExploitProtectionScreen } from './components/security/ExploitProtectionScreen';
 import { DeviceSecurityStateScreen } from './components/security/DeviceSecurityStateScreen';
@@ -54,21 +56,26 @@ import { CertificatesPasskeysScreen } from './components/security/CertificatesPa
 import { BackupRestoreScreen } from './components/security/BackupRestoreScreen';
 import { SecurityAuditLogScreen } from './components/security/SecurityAuditLogScreen';
 import { ThreatModelCenterScreen } from './components/security/ThreatModelCenterScreen';
+
 import {
   DeveloperDebugSecurityScreen,
-  SecurityPostureProfilesScreen
+  SecurityPostureProfilesScreen,
 } from './components/security/SystemIntegrityScreens';
 
+// Data
 import { DEVICE_PROFILES } from './data/deviceProfiles';
 import { getCapabilitiesForProfile } from './data/capabilitiesData';
 import { calculateSecurityScore } from './utils/securityCalculator';
+
 import {
   INITIAL_PRIVACY_STATE,
   SAMPLE_SANDBOX_APPS,
   GUEST_IMAGES,
   SAMPLE_SNAPSHOTS,
-  INITIAL_SYSTEM_NOTIFICATIONS
+  INITIAL_SYSTEM_NOTIFICATIONS,
 } from './data/osArchitectureData';
+
+// Types
 import {
   CapabilityItem,
   DeviceProfile,
@@ -76,108 +83,235 @@ import {
   PrivacyCenterState,
   AppSandboxInfo,
   NetworkAccessLevel,
-  PermissionGrantState,
   SystemScreen,
   VmSnapshot,
   VmStorageInfo,
   AccentColor,
   ThemeMode,
   NavigationMode,
-  SystemNotification
+  SystemNotification,
 } from './types/securedroid';
 
 export default function App() {
-  // Navigation State (Current Active Screen & History Stack)
-  const [currentScreen, setCurrentScreen] = useState<SystemScreen>('homescreen');
-  const [screenHistory, setScreenHistory] = useState<SystemScreen[]>(['homescreen']);
-  const [selectedAppPackage, setSelectedAppPackage] = useState<string | null>(null);
+  /*
+   * --------------------------------------------------------------------------
+   * Navigation
+   * --------------------------------------------------------------------------
+   */
 
-  // Device Profile & Security State
-  const [currentProfile, setCurrentProfile] = useState<DeviceProfile>(DEVICE_PROFILES[0]); 
+  const [currentScreen, setCurrentScreen] =
+    useState<SystemScreen>('homescreen');
 
-  // Native Hardware State
-  const [realDeviceInfo, setRealDeviceInfo] = useState<RealDeviceInfo | null>(null);
+  const [screenHistory, setScreenHistory] = useState<SystemScreen[]>([
+    'homescreen',
+  ]);
+
+  const [selectedAppPackage, setSelectedAppPackage] =
+    useState<string | null>(null);
+
+  /*
+   * --------------------------------------------------------------------------
+   * Device Profile
+   * --------------------------------------------------------------------------
+   */
+
+  const [currentProfile, setCurrentProfile] =
+    useState<DeviceProfile>(DEVICE_PROFILES[0]);
+
+  /*
+   * --------------------------------------------------------------------------
+   * Native Hardware State
+   * --------------------------------------------------------------------------
+   */
+
+  const [realDeviceInfo, setRealDeviceInfo] =
+    useState<RealDeviceInfo | null>(null);
+
   const [batteryLevel, setBatteryLevel] = useState<number>(84);
   const [isCharging, setIsCharging] = useState<boolean>(false);
 
-  // Safely fetch real native data on boot without risk of crashing
+  /*
+   * --------------------------------------------------------------------------
+   * Native data loader
+   * --------------------------------------------------------------------------
+   */
+
   useEffect(() => {
+    let cancelled = false;
+
     async function loadNativeData() {
       try {
-        // Safe Battery Fetch
-        const battery = await SecureDroidNative.getBatteryStatus().catch(() => null);
-        if (battery && battery.success && battery.data) {
+        const battery = await SecureDroidNative.getBatteryStatus().catch(
+          () => null
+        );
+
+        if (
+          !cancelled &&
+          battery &&
+          battery.success &&
+          battery.data
+        ) {
           setBatteryLevel(battery.data.percentage);
           setIsCharging(battery.data.isCharging);
         }
 
-        // Safe Device Info Fetch
-        const device = await SecureDroidNative.getDeviceInfo().catch(() => null);
-        if (device && device.success && device.data) {
+        const device = await SecureDroidNative.getDeviceInfo().catch(
+          () => null
+        );
+
+        if (
+          !cancelled &&
+          device &&
+          device.success &&
+          device.data
+        ) {
           setRealDeviceInfo(device.data);
+
           setCurrentProfile((prev) => ({
             ...prev,
             manufacturer: device.data!.manufacturer,
             model: device.data!.model,
             androidVersion: `Android ${device.data!.androidVersion} (API ${device.data!.sdkVersion})`,
-            totalRamGb: Math.round(device.data!.totalRamMb / 1024),
+            totalRamGb: Math.max(
+              1,
+              Math.round(device.data!.totalRamMb / 1024)
+            ),
           }));
         }
-      } catch (e) {
-        console.warn("Native bridge check skipped safely.");
+      } catch (error) {
+        console.warn(
+          'Native bridge check skipped safely.',
+          error
+        );
       }
     }
-    
+
     loadNativeData();
-    const interval = setInterval(loadNativeData, 30000);
-    return () => clearInterval(interval);
+
+    const interval = window.setInterval(
+      loadNativeData,
+      30000
+    );
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
 
-  // Device Lock State & Overlays
-  const [isDeviceLocked, setIsDeviceLocked] = useState(false);
-  const [isLockdownModeActive, setIsLockdownModeActive] = useState(false);
-  const [isShadeOpen, setIsShadeOpen] = useState(false);
-  const [isVolumePanelOpen, setIsVolumePanelOpen] = useState(false);
-  const [isPowerMenuOpen, setIsPowerMenuOpen] = useState(false);
+  /*
+   * --------------------------------------------------------------------------
+   * Device lock / overlays
+   * --------------------------------------------------------------------------
+   */
 
-  // Navigation Mode (Supports '3-button' | 'gesture' | 'native_mobile')
-  const [navigationMode, setNavigationMode] = useState<NavigationMode>('3-button');
+  const [isDeviceLocked, setIsDeviceLocked] =
+    useState<boolean>(false);
 
-  // PWA Standalone Mode & Installation Prompt State
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+  const [isLockdownModeActive, setIsLockdownModeActive] =
+    useState<boolean>(false);
+
+  const [isShadeOpen, setIsShadeOpen] =
+    useState<boolean>(false);
+
+  const [isVolumePanelOpen, setIsVolumePanelOpen] =
+    useState<boolean>(false);
+
+  const [isPowerMenuOpen, setIsPowerMenuOpen] =
+    useState<boolean>(false);
+
+  /*
+   * --------------------------------------------------------------------------
+   * Navigation mode
+   * --------------------------------------------------------------------------
+   */
+
+  const [navigationMode, setNavigationMode] =
+    useState<NavigationMode>('3-button');
+
+  /*
+   * --------------------------------------------------------------------------
+   * PWA installation
+   * --------------------------------------------------------------------------
+   */
+
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<any>(null);
+
+  const [isStandalone, setIsStandalone] =
+    useState<boolean>(false);
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     const isStandaloneMode =
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone === true;
+
     setIsStandalone(isStandaloneMode);
 
     if (isStandaloneMode) {
       setNavigationMode('native_mobile');
     }
 
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setDeferredPrompt(event);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener(
+      'beforeinstallprompt',
+      handleBeforeInstallPrompt
+    );
+
+    return () => {
+      window.removeEventListener(
+        'beforeinstallprompt',
+        handleBeforeInstallPrompt
+      );
+    };
   }, []);
 
   const handleInstallPwa = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const choiceResult = await deferredPrompt.userChoice;
-    if (choiceResult.outcome === 'accepted') {
-      setDeferredPrompt(null);
+    if (!deferredPrompt) {
+      return;
+    }
+
+    try {
+      deferredPrompt.prompt();
+
+      const choiceResult =
+        await deferredPrompt.userChoice;
+
+      if (choiceResult?.outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } catch (error) {
+      console.warn(
+        'PWA installation prompt failed.',
+        error
+      );
     }
   };
 
+  /*
+   * --------------------------------------------------------------------------
+   * Browser history / Android back
+   * --------------------------------------------------------------------------
+   */
+
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.history) {
-      window.history.replaceState({ screen: 'homescreen' }, '');
+    if (
+      typeof window !== 'undefined' &&
+      window.history
+    ) {
+      window.history.replaceState(
+        { screen: 'homescreen' },
+        '',
+        window.location.href
+      );
     }
 
     const handlePopState = () => {
@@ -185,10 +319,12 @@ export default function App() {
         setIsShadeOpen(false);
         return;
       }
+
       if (isVolumePanelOpen) {
         setIsVolumePanelOpen(false);
         return;
       }
+
       if (isPowerMenuOpen) {
         setIsPowerMenuOpen(false);
         return;
@@ -196,132 +332,350 @@ export default function App() {
 
       setScreenHistory((prev) => {
         if (prev.length > 1) {
-          const newHistory = [...prev];
-          newHistory.pop();
-          const targetScreen = newHistory[newHistory.length - 1];
+          const nextHistory = [...prev];
+          nextHistory.pop();
+
+          const targetScreen =
+            nextHistory[nextHistory.length - 1];
+
           setCurrentScreen(targetScreen);
-          return newHistory;
-        } else {
-          setCurrentScreen('homescreen');
-          return ['homescreen'];
+
+          return nextHistory;
         }
+
+        setCurrentScreen('homescreen');
+
+        return ['homescreen'];
       });
     };
 
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [isShadeOpen, isVolumePanelOpen, isPowerMenuOpen]);
+    window.addEventListener(
+      'popstate',
+      handlePopState
+    );
 
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
-  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+    return () => {
+      window.removeEventListener(
+        'popstate',
+        handlePopState
+      );
+    };
+  }, [
+    isShadeOpen,
+    isVolumePanelOpen,
+    isPowerMenuOpen,
+  ]);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      setTouchStartX(e.touches[0].clientX);
-      setTouchStartY(e.touches[0].clientY);
+  /*
+   * --------------------------------------------------------------------------
+   * Edge swipe back
+   * --------------------------------------------------------------------------
+   */
+
+  const [touchStartX, setTouchStartX] =
+    useState<number | null>(null);
+
+  const [touchStartY, setTouchStartY] =
+    useState<number | null>(null);
+
+  const handleTouchStart = (
+    event: React.TouchEvent
+  ) => {
+    if (event.touches.length !== 1) {
+      return;
     }
+
+    setTouchStartX(
+      event.touches[0].clientX
+    );
+
+    setTouchStartY(
+      event.touches[0].clientY
+    );
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX === null || touchStartY === null) return;
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    const deltaX = touchEndX - touchStartX;
-    const deltaY = Math.abs(touchEndY - touchStartY);
+  const handleTouchEnd = (
+    event: React.TouchEvent
+  ) => {
+    if (
+      touchStartX === null ||
+      touchStartY === null
+    ) {
+      return;
+    }
 
-    if (touchStartX < 40 && deltaX > 70 && deltaY < 80) {
+    const touchEndX =
+      event.changedTouches[0]?.clientX ?? touchStartX;
+
+    const touchEndY =
+      event.changedTouches[0]?.clientY ?? touchStartY;
+
+    const deltaX =
+      touchEndX - touchStartX;
+
+    const deltaY =
+      Math.abs(touchEndY - touchStartY);
+
+    if (
+      touchStartX < 40 &&
+      deltaX > 70 &&
+      deltaY < 80
+    ) {
       handleBack();
     }
+
     setTouchStartX(null);
     setTouchStartY(null);
   };
 
-  const [mediaVolume, setMediaVolume] = useState(70);
-  const [ringVolume, setRingVolume] = useState(85);
-  const [alarmVolume, setAlarmVolume] = useState(90);
-  const [isDnd, setIsDnd] = useState(false);
+  /*
+   * --------------------------------------------------------------------------
+   * Audio state
+   * --------------------------------------------------------------------------
+   */
 
-  const [themeMode, setThemeMode] = useState<ThemeMode>('system');
-  const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(() => {
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return true;
-  });
-  const [accentColor, setAccentColor] = useState<AccentColor>('slate');
+  const [mediaVolume, setMediaVolume] =
+    useState<number>(70);
+
+  const [ringVolume, setRingVolume] =
+    useState<number>(85);
+
+  const [alarmVolume, setAlarmVolume] =
+    useState<number>(90);
+
+  const [isDnd, setIsDnd] =
+    useState<boolean>(false);
+
+  /*
+   * --------------------------------------------------------------------------
+   * Theme
+   * --------------------------------------------------------------------------
+   */
+
+  const [themeMode, setThemeMode] =
+    useState<ThemeMode>('system');
+
+  const [systemPrefersDark, setSystemPrefersDark] =
+    useState<boolean>(() => {
+      if (
+        typeof window !== 'undefined' &&
+        window.matchMedia
+      ) {
+        return window.matchMedia(
+          '(prefers-color-scheme: dark)'
+        ).matches;
+      }
+
+      return true;
+    });
+
+  const [accentColor, setAccentColor] =
+    useState<AccentColor>('slate');
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = (e: MediaQueryListEvent) => {
-      setSystemPrefersDark(e.matches);
+    if (
+      typeof window === 'undefined' ||
+      !window.matchMedia
+    ) {
+      return;
+    }
+
+    const mediaQuery =
+      window.matchMedia(
+        '(prefers-color-scheme: dark)'
+      );
+
+    const handleThemeChange = (
+      event: MediaQueryListEvent
+    ) => {
+      setSystemPrefersDark(event.matches);
     };
+
     setSystemPrefersDark(mediaQuery.matches);
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
+
+    mediaQuery.addEventListener(
+      'change',
+      handleThemeChange
+    );
+
+    return () => {
+      mediaQuery.removeEventListener(
+        'change',
+        handleThemeChange
+      );
+    };
   }, []);
 
-  const isDarkMode = themeMode === 'system' ? systemPrefersDark : themeMode === 'dark';
+  const isDarkMode =
+    themeMode === 'system'
+      ? systemPrefersDark
+      : themeMode === 'dark';
 
-  const [notifications, setNotifications] = useState<SystemNotification[]>(INITIAL_SYSTEM_NOTIFICATIONS);
-  const [privacyState, setPrivacyState] = useState<PrivacyCenterState>(INITIAL_PRIVACY_STATE);
-  const [apps, setApps] = useState<AppSandboxInfo[]>(SAMPLE_SANDBOX_APPS);
-  const [isInternetOff, setIsInternetOff] = useState(false);
-  const [isVpnOnlyActive, setIsVpnOnlyActive] = useState(true);
-  const [snapshots, setSnapshots] = useState<VmSnapshot[]>(SAMPLE_SNAPSHOTS);
+  const isLight = !isDarkMode;
 
-  const vmStorage: VmStorageInfo = {
-    usedGb: 54.2,
-    maximumGb: currentProfile.totalStorageGb,
-    hostFreeSpaceGb: currentProfile.totalStorageGb - 54.2,
-    safetyReserveGb: 20.0,
-    safeGrowthGb: currentProfile.totalStorageGb - 54.2 - 20.0,
-    sparseAllocationActive: true,
-  };
+  /*
+   * --------------------------------------------------------------------------
+   * Notifications / privacy / apps / networking
+   * --------------------------------------------------------------------------
+   */
 
-  const [timeString, setTimeString] = useState('14:32');
+  const [notifications, setNotifications] =
+    useState<SystemNotification[]>(
+      INITIAL_SYSTEM_NOTIFICATIONS
+    );
+
+  const [privacyState, setPrivacyState] =
+    useState<PrivacyCenterState>(
+      INITIAL_PRIVACY_STATE
+    );
+
+  const [apps, setApps] =
+    useState<AppSandboxInfo[]>(
+      SAMPLE_SANDBOX_APPS
+    );
+
+  const [isInternetOff, setIsInternetOff] =
+    useState<boolean>(false);
+
+  const [isVpnOnlyActive, setIsVpnOnlyActive] =
+    useState<boolean>(true);
+
+  const [snapshots, setSnapshots] =
+    useState<VmSnapshot[]>(
+      SAMPLE_SNAPSHOTS
+    );
+
+  /*
+   * --------------------------------------------------------------------------
+   * VM storage
+   * --------------------------------------------------------------------------
+   */
+
+  const vmStorage: VmStorageInfo = useMemo(
+    () => ({
+      usedGb: 54.2,
+      maximumGb: currentProfile.totalStorageGb,
+      hostFreeSpaceGb:
+        currentProfile.totalStorageGb - 54.2,
+      safetyReserveGb: 20,
+      safeGrowthGb:
+        currentProfile.totalStorageGb - 54.2 - 20,
+      sparseAllocationActive: true,
+    }),
+    [currentProfile.totalStorageGb]
+  );
+
+  /*
+   * --------------------------------------------------------------------------
+   * System clock
+   * --------------------------------------------------------------------------
+   */
+
+  const [timeString, setTimeString] =
+    useState<string>('14:32');
+
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setTimeString(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
+
+      setTimeString(
+        now.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        })
+      );
     };
+
     updateTime();
-    const interval = setInterval(updateTime, 20000);
-    return () => clearInterval(interval);
+
+    const interval = window.setInterval(
+      updateTime,
+      20000
+    );
+
+    return () => {
+      window.clearInterval(interval);
+    };
   }, []);
 
-  const capabilities = useMemo<CapabilityItem[]>(() => {
-    return getCapabilitiesForProfile(currentProfile);
-  }, [currentProfile]);
+  /*
+   * --------------------------------------------------------------------------
+   * Calculated security state
+   * --------------------------------------------------------------------------
+   */
 
-  const securityScore = useMemo<SecurityScoreFormula>(() => {
-    return calculateSecurityScore(currentProfile);
-  }, [currentProfile]);
+  const capabilities = useMemo<CapabilityItem[]>(
+    () => getCapabilitiesForProfile(currentProfile),
+    [currentProfile]
+  );
 
-  const navigateTo = (screen: SystemScreen) => {
-    if (typeof window !== 'undefined' && window.history) {
-      window.history.pushState({ screen }, '');
+  const securityScore =
+    useMemo<SecurityScoreFormula>(
+      () => calculateSecurityScore(currentProfile),
+      [currentProfile]
+    );
+
+  /*
+   * --------------------------------------------------------------------------
+   * Navigation helpers
+   * --------------------------------------------------------------------------
+   */
+
+  const navigateTo = (
+    screen: SystemScreen
+  ) => {
+    if (
+      typeof window !== 'undefined' &&
+      window.history
+    ) {
+      window.history.pushState(
+        { screen },
+        '',
+        window.location.href
+      );
     }
-    setScreenHistory((prev) => [...prev, screen]);
+
+    setScreenHistory((prev) => [
+      ...prev,
+      screen,
+    ]);
+
     setCurrentScreen(screen);
   };
 
   const handleBack = () => {
-    if (screenHistory.length > 1) {
-      const newHistory = [...screenHistory];
-      newHistory.pop();
-      const prevScreen = newHistory[newHistory.length - 1];
-      setScreenHistory(newHistory);
-      setCurrentScreen(prevScreen);
-    } else {
-      setCurrentScreen('homescreen');
-    }
+    setScreenHistory((prev) => {
+      if (prev.length <= 1) {
+        setCurrentScreen('homescreen');
+        return ['homescreen'];
+      }
+
+      const nextHistory = [...prev];
+
+      nextHistory.pop();
+
+      const previousScreen =
+        nextHistory[nextHistory.length - 1];
+
+      setCurrentScreen(previousScreen);
+
+      return nextHistory;
+    });
   };
 
   const handleHome = () => {
-    if (typeof window !== 'undefined' && window.history) {
-      window.history.pushState({ screen: 'homescreen' }, '');
+    if (
+      typeof window !== 'undefined' &&
+      window.history
+    ) {
+      window.history.pushState(
+        { screen: 'homescreen' },
+        '',
+        window.location.href
+      );
     }
+
     setScreenHistory(['homescreen']);
     setCurrentScreen('homescreen');
   };
@@ -329,174 +683,342 @@ export default function App() {
   const handleRecents = () => {
     if (currentScreen === 'recents') {
       handleBack();
-    } else {
-      navigateTo('recents');
+      return;
     }
+
+    navigateTo('recents');
   };
 
   const handleSearch = () => {
     navigateTo('search');
   };
 
-  const handleOpenAppDetail = (pkgName: string) => {
-    setSelectedAppPackage(pkgName);
+  /*
+   * --------------------------------------------------------------------------
+   * App selection
+   * --------------------------------------------------------------------------
+   */
+
+  const handleOpenAppDetail = (
+    packageName: string
+  ) => {
+    setSelectedAppPackage(packageName);
     navigateTo('settings_app_detail');
   };
 
+  /*
+   * --------------------------------------------------------------------------
+   * Privacy kill switches
+   * --------------------------------------------------------------------------
+   */
+
   const handleToggleCameraKillswitch = () => {
-    setPrivacyState((prev) => {
-      const nextState = !prev.cameraKillSwitch;
+    setPrivacyState((previous) => {
+      const nextState =
+        !previous.cameraKillSwitch;
+
       const newLog = {
         id: `acc-${Date.now()}`,
-        timestamp: new Date().toLocaleTimeString(),
-        appName: 'Camera HAL Controller',
-        packageName: 'android.hardware.camera',
+        timestamp:
+          new Date().toLocaleTimeString(),
+        appName:
+          'Camera HAL Controller',
+        packageName:
+          'android.hardware.camera',
         uid: 1047,
         sensor: 'CAMERA' as const,
-        actionTaken: nextState ? ('BLOCKED' as const) : ('AUTHORIZED' as const),
-        details: nextState ? 'Global camera killswitch active.' : 'Camera hardware feed active.',
+        actionTaken: nextState
+          ? ('BLOCKED' as const)
+          : ('AUTHORIZED' as const),
+        details: nextState
+          ? 'Global camera killswitch active.'
+          : 'Camera hardware feed active.',
         isDemo: false,
       };
+
       return {
-        ...prev,
+        ...previous,
         cameraKillSwitch: nextState,
-        activeCameraApps: nextState ? [] : prev.activeCameraApps,
-        accessLog: [newLog, ...prev.accessLog].slice(0, 40),
+        activeCameraApps: nextState
+          ? []
+          : previous.activeCameraApps,
+        accessLog: [
+          newLog,
+          ...previous.accessLog,
+        ].slice(0, 40),
       };
     });
   };
 
   const handleToggleMicKillswitch = () => {
-    setPrivacyState((prev) => {
-      const nextState = !prev.micKillSwitch;
+    setPrivacyState((previous) => {
+      const nextState =
+        !previous.micKillSwitch;
+
       const newLog = {
         id: `acc-${Date.now()}`,
-        timestamp: new Date().toLocaleTimeString(),
-        appName: 'AudioFlinger Subsystem',
-        packageName: 'android.hardware.audio',
+        timestamp:
+          new Date().toLocaleTimeString(),
+        appName:
+          'AudioFlinger Subsystem',
+        packageName:
+          'android.hardware.audio',
         uid: 1041,
         sensor: 'MIC' as const,
-        actionTaken: nextState ? ('BLOCKED' as const) : ('AUTHORIZED' as const),
-        details: nextState ? 'Microphone muted with zero-bytes.' : 'Microphone audio feed restored.',
+        actionTaken: nextState
+          ? ('BLOCKED' as const)
+          : ('AUTHORIZED' as const),
+        details: nextState
+          ? 'Microphone muted with zero-bytes.'
+          : 'Microphone audio feed restored.',
         isDemo: false,
       };
+
       return {
-        ...prev,
+        ...previous,
         micKillSwitch: nextState,
-        activeMicApps: nextState ? [] : prev.activeMicApps,
-        accessLog: [newLog, ...prev.accessLog].slice(0, 40),
+        activeMicApps: nextState
+          ? []
+          : previous.activeMicApps,
+        accessLog: [
+          newLog,
+          ...previous.accessLog,
+        ].slice(0, 40),
       };
     });
   };
 
   const handleToggleSensorKillswitch = () => {
-    setPrivacyState((prev) => {
-      const nextState = !prev.sensorKillSwitch;
+    setPrivacyState((previous) => {
+      const nextState =
+        !previous.sensorKillSwitch;
+
       const newLog = {
         id: `acc-${Date.now()}`,
-        timestamp: new Date().toLocaleTimeString(),
-        appName: 'SensorManager HAL',
-        packageName: 'android.hardware.sensors',
+        timestamp:
+          new Date().toLocaleTimeString(),
+        appName:
+          'SensorManager HAL',
+        packageName:
+          'android.hardware.sensors',
         uid: 1000,
         sensor: 'SENSORS' as const,
-        actionTaken: nextState ? ('BLOCKED' as const) : ('AUTHORIZED' as const),
-        details: nextState ? 'Motion/gyro sensors disconnected.' : 'Sensors polling resumed.',
+        actionTaken: nextState
+          ? ('BLOCKED' as const)
+          : ('AUTHORIZED' as const),
+        details: nextState
+          ? 'Motion/gyro sensors disconnected.'
+          : 'Sensors polling resumed.',
         isDemo: false,
       };
+
       return {
-        ...prev,
+        ...previous,
         sensorKillSwitch: nextState,
-        accessLog: [newLog, ...prev.accessLog].slice(0, 40),
+        accessLog: [
+          newLog,
+          ...previous.accessLog,
+        ].slice(0, 40),
       };
     });
   };
 
   const handleToggleClipboardAlerts = () => {
-    setPrivacyState((prev) => ({
-      ...prev,
-      clipboardAccessAlerts: !prev.clipboardAccessAlerts,
+    setPrivacyState((previous) => ({
+      ...previous,
+      clipboardAccessAlerts:
+        !previous.clipboardAccessAlerts,
     }));
   };
 
+  /*
+   * --------------------------------------------------------------------------
+   * Lockdown
+   * --------------------------------------------------------------------------
+   */
+
   const handleToggleLockdownMode = () => {
-    setIsLockdownModeActive((prev) => {
-      const next = !prev;
-      if (next) {
+    setIsLockdownModeActive((previous) => {
+      const nextState = !previous;
+
+      if (nextState) {
         setIsDeviceLocked(true);
       }
-      return next;
+
+      return nextState;
     });
   };
 
-  const handleUpdateAppNetwork = (packageName: string, level: NetworkAccessLevel) => {
-    setApps((prev) => prev.map((a) => (a.packageName === packageName ? { ...a, networkAccess: level } : a)));
+  /*
+   * --------------------------------------------------------------------------
+   * App network / permissions
+   * --------------------------------------------------------------------------
+   */
+
+  const handleUpdateAppNetwork = (
+    packageName: string,
+    level: NetworkAccessLevel
+  ) => {
+    setApps((previous) =>
+      previous.map((app) =>
+        app.packageName === packageName
+          ? {
+              ...app,
+              networkAccess: level,
+            }
+          : app
+      )
+    );
   };
 
-  const handleUpdateAppPermission = (packageName: string, permKey: string, granted: boolean) => {
-    setApps((prev) =>
-      prev.map((a) => {
-        if (a.packageName === packageName) {
-          const currentPermissions = a.permissions || {};
-          return {
-            ...a,
-            permissions: {
-              ...currentPermissions,
-              [permKey]: granted ? 'GRANTED' : 'DENIED',
-            },
-          };
+  const handleUpdateAppPermission = (
+    packageName: string,
+    permKey: string,
+    granted: boolean
+  ) => {
+    setApps((previous) =>
+      previous.map((app) => {
+        if (
+          app.packageName !== packageName
+        ) {
+          return app;
         }
-        return a;
+
+        const currentPermissions =
+          app.permissions || {};
+
+        return {
+          ...app,
+          permissions: {
+            ...currentPermissions,
+            [permKey]: granted
+              ? 'GRANTED'
+              : 'DENIED',
+          },
+        };
       })
     );
   };
 
-  const handleCreateSnapshot = (name: string) => {
-    const newSnap: VmSnapshot = {
+  /*
+   * --------------------------------------------------------------------------
+   * Snapshots
+   * --------------------------------------------------------------------------
+   */
+
+  const handleCreateSnapshot = (
+    name: string
+  ) => {
+    const newSnapshot: VmSnapshot = {
       id: `snap-${Date.now()}`,
       name,
-      createdAt: new Date().toLocaleString(),
-      guestVersion: '2.0.4-signed',
-      sizeMb: 140.0,
-      sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+      createdAt:
+        new Date().toLocaleString(),
+      guestVersion:
+        '2.0.4-signed',
+      sizeMb: 140,
+      sha256:
+        '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
       status: 'READY',
-      note: 'User point-in-time snapshot',
+      note:
+        'User point-in-time snapshot',
     };
-    setSnapshots((prev) => [newSnap, ...prev]);
+
+    setSnapshots((previous) => [
+      newSnapshot,
+      ...previous,
+    ]);
   };
 
-  const handleRestoreSnapshot = (id: string) => {
-    alert(`Restoring snapshot ${id}. Memory state rolling back to verified baseline.`);
+  const handleRestoreSnapshot = (
+    id: string
+  ) => {
+    window.alert(
+      `Restoring snapshot ${id}. Memory state rolling back to verified baseline.`
+    );
   };
 
-  const handleDeleteSnapshot = (id: string) => {
-    setSnapshots((prev) => prev.filter((s) => s.id !== id));
+  const handleDeleteSnapshot = (
+    id: string
+  ) => {
+    setSnapshots((previous) =>
+      previous.filter(
+        (snapshot) =>
+          snapshot.id !== id
+      )
+    );
   };
 
-  const handleDismissNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  /*
+   * --------------------------------------------------------------------------
+   * Notifications
+   * --------------------------------------------------------------------------
+   */
+
+  const handleDismissNotification = (
+    id: string
+  ) => {
+    setNotifications((previous) =>
+      previous.filter(
+        (notification) =>
+          notification.id !== id
+      )
+    );
   };
 
   const handleClearAllNotifications = () => {
-    setNotifications((prev) => prev.filter((n) => !n.isDismissible));
+    setNotifications((previous) =>
+      previous.filter(
+        (notification) =>
+          !notification.isDismissible
+      )
+    );
   };
 
-  const isLight = !isDarkMode;
-  const activeSelectedApp = apps.find((a) => a.packageName === selectedAppPackage) || apps[0];
+  /*
+   * --------------------------------------------------------------------------
+   * Selected application
+   * --------------------------------------------------------------------------
+   */
+
+  const activeSelectedApp =
+    apps.find(
+      (app) =>
+        app.packageName ===
+        selectedAppPackage
+    ) || apps[0];
+
+  /*
+   * --------------------------------------------------------------------------
+   * Render
+   * --------------------------------------------------------------------------
+   */
 
   return (
     <div
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
-        isLight ? 'bg-zinc-50 text-zinc-900' : 'bg-zinc-950 text-zinc-100'
+        isLight
+          ? 'bg-zinc-50 text-zinc-900'
+          : 'bg-zinc-950 text-zinc-100'
       }`}
     >
-      {/* 1. Android Top System Status Bar */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Android status bar                                                 */}
+      {/* ------------------------------------------------------------------ */}
+
       <SystemStatusBar
         privacyState={privacyState}
-        onOpenQuickSettings={() => setIsShadeOpen(true)}
-        onOpenPrivacyCenter={() => navigateTo('privacy_center')}
-        isLockdownActive={isLockdownModeActive}
+        onOpenQuickSettings={() =>
+          setIsShadeOpen(true)
+        }
+        onOpenPrivacyCenter={() =>
+          navigateTo('privacy_center')
+        }
+        isLockdownActive={
+          isLockdownModeActive
+        }
         timeString={timeString}
         isLight={isLight}
         batteryLevel={batteryLevel}
@@ -504,58 +1026,117 @@ export default function App() {
         isDndActive={isDnd}
       />
 
-      {/* 2. Lock Screen Overlay (if locked) */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Lock screen                                                        */}
+      {/* ------------------------------------------------------------------ */}
+
       <LockScreenView
         isLocked={isDeviceLocked}
-        onUnlock={() => setIsDeviceLocked(false)}
-        isLockdownActive={isLockdownModeActive}
-        onToggleLockdown={handleToggleLockdownMode}
-        hostStatus={securityScore.hostStatus}
-        qualitativeTier={securityScore.qualitativeTier}
+        onUnlock={() =>
+          setIsDeviceLocked(false)
+        }
+        isLockdownActive={
+          isLockdownModeActive
+        }
+        onToggleLockdown={
+          handleToggleLockdownMode
+        }
+        hostStatus={
+          securityScore.hostStatus
+        }
+        qualitativeTier={
+          securityScore.qualitativeTier
+        }
         timeString={timeString}
         isLight={isLight}
       />
 
-      {/* 3. Quick Settings Notification Shade Pull-down */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Quick settings                                                     */}
+      {/* ------------------------------------------------------------------ */}
+
       <QuickSettingsShade
         isOpen={isShadeOpen}
-        onClose={() => setIsShadeOpen(false)}
+        onClose={() =>
+          setIsShadeOpen(false)
+        }
         privacyState={privacyState}
-        onToggleCameraKillswitch={handleToggleCameraKillswitch}
-        onToggleMicKillswitch={handleToggleMicKillswitch}
-        onToggleSensorKillswitch={handleToggleSensorKillswitch}
-        isVpnOnlyActive={isVpnOnlyActive}
-        onToggleVpnOnly={() => setIsVpnOnlyActive(!isVpnOnlyActive)}
+        onToggleCameraKillswitch={
+          handleToggleCameraKillswitch
+        }
+        onToggleMicKillswitch={
+          handleToggleMicKillswitch
+        }
+        onToggleSensorKillswitch={
+          handleToggleSensorKillswitch
+        }
+        isVpnOnlyActive={
+          isVpnOnlyActive
+        }
+        onToggleVpnOnly={() =>
+          setIsVpnOnlyActive(
+            (previous) => !previous
+          )
+        }
         isInternetOff={isInternetOff}
-        onToggleInternet={() => setIsInternetOff(!isInternetOff)}
-        isLockdownActive={isLockdownModeActive}
-        onToggleLockdown={handleToggleLockdownMode}
-        onNavigateTab={(scr) => {
-          navigateTo(scr);
+        onToggleInternet={() =>
+          setIsInternetOff(
+            (previous) => !previous
+          )
+        }
+        isLockdownActive={
+          isLockdownModeActive
+        }
+        onToggleLockdown={
+          handleToggleLockdownMode
+        }
+        onNavigateTab={(screen) => {
+          navigateTo(screen);
           setIsShadeOpen(false);
         }}
         notifications={notifications}
-        onDismissNotification={handleDismissNotification}
-        onClearAllNotifications={handleClearAllNotifications}
+        onDismissNotification={
+          handleDismissNotification
+        }
+        onClearAllNotifications={
+          handleClearAllNotifications
+        }
         themeMode={themeMode}
         onCycleThemeMode={() => {
-          if (themeMode === 'system') setThemeMode('dark');
-          else if (themeMode === 'dark') setThemeMode('light');
-          else setThemeMode('system');
+          if (themeMode === 'system') {
+            setThemeMode('dark');
+          } else if (
+            themeMode === 'dark'
+          ) {
+            setThemeMode('light');
+          } else {
+            setThemeMode('system');
+          }
         }}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => {
-          setThemeMode(isDarkMode ? 'light' : 'dark');
+          setThemeMode(
+            isDarkMode ? 'light' : 'dark'
+          );
         }}
         isDnd={isDnd}
-        onToggleDnd={() => setIsDnd(!isDnd)}
+        onToggleDnd={() =>
+          setIsDnd(
+            (previous) => !previous
+          )
+        }
         isLight={isLight}
       />
 
-      {/* 4. Floating Volume Panel */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Volume panel                                                       */}
+      {/* ------------------------------------------------------------------ */}
+
       <VolumePanel
         isOpen={isVolumePanelOpen}
-        onClose={() => setIsVolumePanelOpen(false)}
+        onClose={() =>
+          setIsVolumePanelOpen(false)
+        }
         isLight={isLight}
         mediaVolume={mediaVolume}
         setMediaVolume={setMediaVolume}
@@ -567,29 +1148,60 @@ export default function App() {
         setIsDnd={setIsDnd}
       />
 
-      {/* 5. Floating Power Menu & Lockdown Dialog */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Power menu                                                         */}
+      {/* ------------------------------------------------------------------ */}
+
       <PowerMenu
         isOpen={isPowerMenuOpen}
-        onClose={() => setIsPowerMenuOpen(false)}
-        onLockdown={handleToggleLockdownMode}
-        onRestart={() => alert('Soft rebooting SecureDroid OS...')}
-        onPowerOff={() => alert('Powering off SecureDroid OS...')}
+        onClose={() =>
+          setIsPowerMenuOpen(false)
+        }
+        onLockdown={
+          handleToggleLockdownMode
+        }
+        onRestart={() =>
+          window.alert(
+            'Soft rebooting SecureDroid OS...'
+          )
+        }
+        onPowerOff={() =>
+          window.alert(
+            'Powering off SecureDroid OS...'
+          )
+        }
         isLight={isLight}
       />
 
-      {/* 6. Active Screen Viewport */}
-      <main className={`flex-1 max-w-4xl w-full mx-auto overflow-y-auto ${
-        navigationMode === 'native_mobile' ? 'pb-6' : 'pb-16'
-      }`}>
-        {/* Level 1: Normal System Experience */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Main viewport                                                      */}
+      {/* ------------------------------------------------------------------ */}
+
+      <main
+        className={`flex-1 max-w-4xl w-full mx-auto overflow-y-auto ${
+          navigationMode === 'native_mobile'
+            ? 'pb-6'
+            : 'pb-16'
+        }`}
+      >
+        {/* ================================================================ */}
+        {/* Level 1 - Launcher                                               */}
+        {/* ================================================================ */}
+
         {currentScreen === 'homescreen' && (
           <SystemHomeScreen
             profile={currentProfile}
-            hostStatus={securityScore.hostStatus}
-            qualitativeTier={securityScore.qualitativeTier}
+            hostStatus={
+              securityScore.hostStatus
+            }
+            qualitativeTier={
+              securityScore.qualitativeTier
+            }
             privacyState={privacyState}
             onNavigateTab={navigateTo}
-            onOpenAppDrawer={() => navigateTo('app_drawer')}
+            onOpenAppDrawer={() =>
+              navigateTo('app_drawer')
+            }
             onOpenSearch={handleSearch}
             isLight={isLight}
           />
@@ -598,8 +1210,12 @@ export default function App() {
         {currentScreen === 'app_drawer' && (
           <AppDrawerScreen
             apps={apps}
-            onOpenApp={(pkg) => handleOpenAppDetail(pkg)}
-            onOpenAppDetail={handleOpenAppDetail}
+            onOpenApp={
+              handleOpenAppDetail
+            }
+            onOpenAppDetail={
+              handleOpenAppDetail
+            }
             onNavigate={navigateTo}
             isLight={isLight}
           />
@@ -609,8 +1225,12 @@ export default function App() {
           <RecentAppsScreen
             apps={apps}
             onSelectApp={navigateTo}
-            onClearAll={() => navigateTo('homescreen')}
-            onOpenAppDetail={handleOpenAppDetail}
+            onClearAll={() =>
+              navigateTo('homescreen')
+            }
+            onOpenAppDetail={
+              handleOpenAppDetail
+            }
             isLight={isLight}
           />
         )}
@@ -619,19 +1239,28 @@ export default function App() {
           <GlobalSearchScreen
             onClose={handleBack}
             onNavigate={navigateTo}
-            onOpenAppDetail={handleOpenAppDetail}
+            onOpenAppDetail={
+              handleOpenAppDetail
+            }
             apps={apps}
             isLight={isLight}
           />
         )}
 
-        {/* Android Settings Subsystem */}
+        {/* ================================================================ */}
+        {/* Android Settings                                                 */}
+        {/* ================================================================ */}
+
         {currentScreen === 'settings' && (
           <SettingsHomeScreen
             onNavigate={navigateTo}
             profile={currentProfile}
-            hostStatus={securityScore.hostStatus}
-            qualitativeTier={securityScore.qualitativeTier}
+            hostStatus={
+              securityScore.hostStatus
+            }
+            qualitativeTier={
+              securityScore.qualitativeTier
+            }
             isLight={isLight}
           />
         )}
@@ -640,22 +1269,39 @@ export default function App() {
           <SettingsNetworkScreen
             onBack={handleBack}
             isInternetOff={isInternetOff}
-            onToggleInternet={() => setIsInternetOff(!isInternetOff)}
-            isVpnOnlyActive={isVpnOnlyActive}
-            onToggleVpnOnly={() => setIsVpnOnlyActive(!isVpnOnlyActive)}
+            onToggleInternet={() =>
+              setIsInternetOff(
+                (previous) => !previous
+              )
+            }
+            isVpnOnlyActive={
+              isVpnOnlyActive
+            }
+            onToggleVpnOnly={() =>
+              setIsVpnOnlyActive(
+                (previous) => !previous
+              )
+            }
             isLight={isLight}
           />
         )}
 
         {currentScreen === 'settings_connected' && (
-          <SettingsConnectedScreen onBack={handleBack} isLight={isLight} />
+          <SettingsConnectedScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'settings_navigation' && (
           <SettingsNavigationScreen
             onBack={handleBack}
-            navigationMode={navigationMode}
-            onSelectNavigationMode={setNavigationMode}
+            navigationMode={
+              navigationMode
+            }
+            onSelectNavigationMode={
+              setNavigationMode
+            }
             isLight={isLight}
           />
         )}
@@ -663,9 +1309,15 @@ export default function App() {
         {currentScreen === 'settings_install_app' && (
           <InstallAppScreen
             onBack={handleBack}
-            deferredPrompt={deferredPrompt}
-            onInstallPwa={handleInstallPwa}
-            isStandalone={isStandalone}
+            deferredPrompt={
+              deferredPrompt
+            }
+            onInstallPwa={
+              handleInstallPwa
+            }
+            isStandalone={
+              isStandalone
+            }
             isLight={isLight}
           />
         )}
@@ -673,34 +1325,68 @@ export default function App() {
         {currentScreen === 'settings_apps' && (
           <AppSandboxScreen
             apps={apps}
-            onUpdateAppNetwork={handleUpdateAppNetwork}
-            onUpdateAppPermission={(pkg, perm, state) =>
-              handleUpdateAppPermission(pkg, perm, state === 'GRANTED')
+            onUpdateAppNetwork={
+              handleUpdateAppNetwork
+            }
+            onUpdateAppPermission={(
+              packageName,
+              permission,
+              state
+            ) =>
+              handleUpdateAppPermission(
+                packageName,
+                permission,
+                state === 'GRANTED'
+              )
             }
           />
         )}
 
         {currentScreen === 'settings_app_detail' && (
-          <AppDetailScreen
-            app={activeSelectedApp}
+          activeSelectedApp && (
+            <AppDetailScreen
+              app={activeSelectedApp}
+              onBack={handleBack}
+              onUpdateNetworkAccess={
+                handleUpdateAppNetwork
+              }
+              onToggleHardenedMalloc={() => {}}
+              onToggleStrictIoctl={() => {}}
+              onTogglePermission={(
+                packageName,
+                permission
+              ) => {
+                const currentGranted =
+                  (
+                    activeSelectedApp.permissions as any
+                  )?.[
+                    permission.toLowerCase()
+                  ] === 'GRANTED';
+
+                handleUpdateAppPermission(
+                  packageName,
+                  permission.toLowerCase(),
+                  !currentGranted
+                );
+              }}
+              isLight={isLight}
+            />
+          )
+        )}
+
+        {currentScreen === 'settings_battery' && (
+          <SettingsBatteryScreen
             onBack={handleBack}
-            onUpdateNetworkAccess={handleUpdateAppNetwork}
-            onToggleHardenedMalloc={() => {}}
-            onToggleStrictIoctl={() => {}}
-            onTogglePermission={(pkg, perm) => {
-              const currentGranted = (activeSelectedApp.permissions as any)?.[perm.toLowerCase()] === 'GRANTED';
-              handleUpdateAppPermission(pkg, perm.toLowerCase(), !currentGranted);
-            }}
             isLight={isLight}
           />
         )}
 
-        {currentScreen === 'settings_battery' && (
-          <SettingsBatteryScreen onBack={handleBack} isLight={isLight} />
-        )}
-
         {currentScreen === 'settings_storage' && (
-          <SettingsStorageScreen onBack={handleBack} profile={currentProfile} isLight={isLight} />
+          <SettingsStorageScreen
+            onBack={handleBack}
+            profile={currentProfile}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'settings_wallpaper' && (
@@ -721,11 +1407,17 @@ export default function App() {
               onClose={handleBack}
               isLight={isLight}
               mediaVolume={mediaVolume}
-              setMediaVolume={setMediaVolume}
+              setMediaVolume={
+                setMediaVolume
+              }
               ringVolume={ringVolume}
-              setRingVolume={setRingVolume}
+              setRingVolume={
+                setRingVolume
+              }
               alarmVolume={alarmVolume}
-              setAlarmVolume={setAlarmVolume}
+              setAlarmVolume={
+                setAlarmVolume
+              }
               isDnd={isDnd}
               setIsDnd={setIsDnd}
             />
@@ -735,19 +1427,30 @@ export default function App() {
         {currentScreen === 'settings_about' && (
           <SettingsAboutScreen
             onBack={handleBack}
-            onOpenDiagnostics={() => navigateTo('advanced_diagnostics')}
+            onOpenDiagnostics={() =>
+              navigateTo(
+                'advanced_diagnostics'
+              )
+            }
             profile={currentProfile}
             isLight={isLight}
           />
         )}
 
-        {/* Level 2: Security & Privacy Centers */}
+        {/* ================================================================ */}
+        {/* Level 2 - Security & Privacy                                     */}
+        {/* ================================================================ */}
+
         {currentScreen === 'security_center' && (
           <SecurityCenterScreen
             onBack={handleBack}
             onNavigate={navigateTo}
-            hostStatus={securityScore.hostStatus}
-            qualitativeTier={securityScore.qualitativeTier}
+            hostStatus={
+              securityScore.hostStatus
+            }
+            qualitativeTier={
+              securityScore.qualitativeTier
+            }
             profile={currentProfile}
             isLight={isLight}
           />
@@ -756,11 +1459,21 @@ export default function App() {
         {currentScreen === 'privacy_center' && (
           <PrivacyCenterScreen
             privacyState={privacyState}
-            onToggleCameraKillswitch={handleToggleCameraKillswitch}
-            onToggleMicKillswitch={handleToggleMicKillswitch}
-            onToggleSensorKillswitch={handleToggleSensorKillswitch}
-            onToggleClipboardAlerts={handleToggleClipboardAlerts}
-            sensorLogs={privacyState.accessLog}
+            onToggleCameraKillswitch={
+              handleToggleCameraKillswitch
+            }
+            onToggleMicKillswitch={
+              handleToggleMicKillswitch
+            }
+            onToggleSensorKillswitch={
+              handleToggleSensorKillswitch
+            }
+            onToggleClipboardAlerts={
+              handleToggleClipboardAlerts
+            }
+            sensorLogs={
+              privacyState.accessLog
+            }
             onNavigate={navigateTo}
             onBack={handleBack}
             isLight={isLight}
@@ -771,8 +1484,16 @@ export default function App() {
           <PermissionManagerScreen
             apps={apps}
             onBack={handleBack}
-            onUpdateAppPermission={(pkg, perm, val) =>
-              handleUpdateAppPermission(pkg, perm.toLowerCase(), val)
+            onUpdateAppPermission={(
+              packageName,
+              permission,
+              value
+            ) =>
+              handleUpdateAppPermission(
+                packageName,
+                permission.toLowerCase(),
+                value
+              )
             }
             isLight={isLight}
           />
@@ -784,9 +1505,15 @@ export default function App() {
             vmStorage={vmStorage}
             guestImages={GUEST_IMAGES}
             snapshots={snapshots}
-            onCreateSnapshot={handleCreateSnapshot}
-            onRestoreSnapshot={handleRestoreSnapshot}
-            onDeleteSnapshot={handleDeleteSnapshot}
+            onCreateSnapshot={
+              handleCreateSnapshot
+            }
+            onRestoreSnapshot={
+              handleRestoreSnapshot
+            }
+            onDeleteSnapshot={
+              handleDeleteSnapshot
+            }
             onNavigate={navigateTo}
             onBack={handleBack}
             isLight={isLight}
@@ -794,93 +1521,158 @@ export default function App() {
         )}
 
         {currentScreen === 'system_updates' && (
-          <SystemUpdatesScreen onBack={handleBack} isLight={isLight} />
+          <SystemUpdatesScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'app_sandbox' && (
           <AppSandboxScreen
             apps={apps}
-            onUpdateAppNetwork={handleUpdateAppNetwork}
-            onUpdateAppPermission={(pkg, perm, state) =>
-              handleUpdateAppPermission(pkg, perm, state === 'GRANTED')
+            onUpdateAppNetwork={
+              handleUpdateAppNetwork
+            }
+            onUpdateAppPermission={(
+              packageName,
+              permission,
+              state
+            ) =>
+              handleUpdateAppPermission(
+                packageName,
+                permission,
+                state === 'GRANTED'
+              )
             }
           />
         )}
 
-        {/* Feature Pack Screen Renders */}
+        {/* ================================================================ */}
+        {/* Security Feature Pack                                            */}
+        {/* ================================================================ */}
+
         {currentScreen === 'advanced_protection' && (
-          <AdvancedProtectionScreen onBack={handleBack} isLight={isLight} />
+          <AdvancedProtectionScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'exploit_protection' && (
-          <ExploitProtectionScreen onBack={handleBack} isLight={isLight} />
+          <ExploitProtectionScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'device_security_state' && (
           <DeviceSecurityStateScreen
             onBack={handleBack}
-            onTriggerLockdown={handleToggleLockdownMode}
+            onTriggerLockdown={
+              handleToggleLockdownMode
+            }
             isLight={isLight}
           />
         )}
 
         {currentScreen === 'authentication_duress' && (
-          <AuthenticationDuressScreen onBack={handleBack} isLight={isLight} />
+          <AuthenticationDuressScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'emergency_protection' && (
           <EmergencyProtectionScreen
             onBack={handleBack}
-            onLockdown={handleToggleLockdownMode}
+            onLockdown={
+              handleToggleLockdownMode
+            }
             isLight={isLight}
           />
         )}
 
         {currentScreen === 'theft_protection' && (
-          <TheftProtectionScreen onBack={handleBack} isLight={isLight} />
+          <TheftProtectionScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'app_verification' && (
-          <AppVerificationScreen onBack={handleBack} isLight={isLight} />
+          <AppVerificationScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'securedroid_store' && (
-          <SecureDroidStoreScreen onBack={handleBack} isLight={isLight} />
+          <SecureDroidStoreScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'browser_web_security' && (
-          <BrowserWebSecurityScreen onBack={handleBack} isLight={isLight} />
+          <BrowserWebSecurityScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'complete_sensor_privacy' && (
-          <CompleteSensorPrivacyScreen onBack={handleBack} isLight={isLight} />
+          <CompleteSensorPrivacyScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'certificates_passkeys' && (
-          <CertificatesPasskeysScreen onBack={handleBack} isLight={isLight} />
+          <CertificatesPasskeysScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'backup_restore' && (
-          <BackupRestoreScreen onBack={handleBack} isLight={isLight} />
+          <BackupRestoreScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'security_audit_log' && (
-          <SecurityAuditLogScreen onBack={handleBack} isLight={isLight} />
+          <SecurityAuditLogScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'threat_model_center' && (
-          <ThreatModelCenterScreen onBack={handleBack} isLight={isLight} />
+          <ThreatModelCenterScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'developer_debug_security' && (
-          <DeveloperDebugSecurityScreen onBack={handleBack} isLight={isLight} />
+          <DeveloperDebugSecurityScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
         {currentScreen === 'security_posture_profiles' && (
-          <SecurityPostureProfilesScreen onBack={handleBack} isLight={isLight} />
+          <SecurityPostureProfilesScreen
+            onBack={handleBack}
+            isLight={isLight}
+          />
         )}
 
-        {/* Level 3: Advanced Diagnostics Console */}
+        {/* ================================================================ */}
+        {/* Level 3 - Advanced Diagnostics                                   */}
+        {/* ================================================================ */}
+
         {currentScreen === 'advanced_diagnostics' && (
           <AdvancedDiagnosticsScreen
             profile={currentProfile}
@@ -892,14 +1684,21 @@ export default function App() {
         )}
       </main>
 
-      {/* 7. Android System Navigation Bar (3-Button, Gesture Bar, or Hidden for Native Mobile) */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Android navigation bar                                             */}
+      {/* ------------------------------------------------------------------ */}
+
       <SystemNavigationBar
         onBack={handleBack}
         onHome={handleHome}
         onRecents={handleRecents}
         onSearch={handleSearch}
-        onOpenVolume={() => setIsVolumePanelOpen(true)}
-        onOpenPower={() => setIsPowerMenuOpen(true)}
+        onOpenVolume={() =>
+          setIsVolumePanelOpen(true)
+        }
+        onOpenPower={() =>
+          setIsPowerMenuOpen(true)
+        }
         currentScreen={currentScreen}
         navigationMode={navigationMode}
         isLight={isLight}
