@@ -3,32 +3,36 @@ package org.securedroid.app
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
-import android.os.SystemClock
-import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 
 class DeviceInfoManager(private val context: Context) {
 
     fun getRealDeviceInfo(): JSObject {
-        val data = JSObject()
+        val activityManager =
+            context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                ?: return JSObject().apply {
+                    put("status", "error")
+                    put("errorCode", "UNKNOWN_ERROR")
+                    put("message", "ActivityManager is unavailable.")
+                }
 
-        data.put("manufacturer", Build.MANUFACTURER)
-        data.put("brand", Build.BRAND)
-        data.put("model", Build.MODEL)
-        data.put("device", Build.DEVICE)
-        data.put("androidVersion", Build.VERSION.RELEASE)
-        data.put("sdkVersion", Build.VERSION.SDK_INT)
-
-        val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memoryInfo = ActivityManager.MemoryInfo()
-        actManager.getMemoryInfo(memoryInfo)
-        
-        data.put("totalRamMb", memoryInfo.totalMem / (1024 * 1024))
-        data.put("availableRamMb", memoryInfo.availMem / (1024 * 1024))
+        activityManager.getMemoryInfo(memoryInfo)
 
-        val result = JSObject()
-        result.put("success", true)
-        result.put("data", data)
-        return result
+        val data = JSObject().apply {
+            put("manufacturer", Build.MANUFACTURER)
+            put("brand", Build.BRAND)
+            put("model", Build.MODEL)
+            put("device", Build.DEVICE)
+            put("androidVersion", Build.VERSION.RELEASE ?: "unknown")
+            put("sdkVersion", Build.VERSION.SDK_INT)
+            put("totalRamMb", memoryInfo.totalMem / (1024 * 1024))
+            put("availableRamMb", memoryInfo.availMem / (1024 * 1024))
+        }
+
+        return JSObject().apply {
+            put("status", "ok")
+            put("data", data)
+        }
     }
 }
