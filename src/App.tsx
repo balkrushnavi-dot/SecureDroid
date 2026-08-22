@@ -10,6 +10,10 @@ import { AppDrawerScreen } from './components/launcher/AppDrawerScreen';
 import { RecentAppsScreen } from './components/launcher/RecentAppsScreen';
 import { GlobalSearchScreen } from './components/launcher/GlobalSearchScreen';
 
+// Native Bridge Imports
+import { SecureDroidNative } from './services/native/SecureDroidNative';
+import { RealDeviceInfo, RealBatteryStatus } from './types/native';
+
 // Settings Screens
 import {
   SettingsHomeScreen,
@@ -89,7 +93,47 @@ export default function App() {
   const [selectedAppPackage, setSelectedAppPackage] = useState<string | null>(null);
 
   // Device Profile & Security State
-  const [currentProfile, setCurrentProfile] = useState<DeviceProfile>(DEVICE_PROFILES[0]); // POCO X5 Pro 5G
+  const [currentProfile, setCurrentProfile] = useState<DeviceProfile>(DEVICE_PROFILES[0]); 
+
+  // Native Hardware State
+  const [realDeviceInfo, setRealDeviceInfo] = useState<RealDeviceInfo | null>(null);
+  const [batteryLevel, setBatteryLevel] = useState<number>(84);
+  const [isCharging, setIsCharging] = useState<boolean>(false);
+
+  // Fetch real native data on boot
+  useEffect(() => {
+    async function loadNativeData() {
+      try {
+        // Fetch battery
+        const battery = await SecureDroidNative.getBatteryStatus();
+        if (battery.success && battery.data) {
+          setBatteryLevel(battery.data.percentage);
+          setIsCharging(battery.data.isCharging);
+        }
+
+        // Fetch device info
+        const device = await SecureDroidNative.getDeviceInfo();
+        if (device.success && device.data) {
+          setRealDeviceInfo(device.data);
+          // Dynamically update the profile UI with real device specs
+          setCurrentProfile((prev) => ({
+            ...prev,
+            manufacturer: device.data!.manufacturer,
+            model: device.data!.model,
+            androidVersion: `Android ${device.data!.androidVersion} (API ${device.data!.sdkVersion})`,
+            totalRamGb: Math.round(device.data!.totalRamMb / 1024),
+          }));
+        }
+      } catch (e) {
+        console.warn("Running in web browser, native plugin skipped.");
+      }
+    }
+    
+    loadNativeData();
+    // Refresh battery every 30 seconds
+    const interval = setInterval(loadNativeData, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Device Lock State & Overlays
   const [isDeviceLocked, setIsDeviceLocked] = useState(false);
@@ -106,13 +150,11 @@ export default function App() {
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
 
   useEffect(() => {
-    // Detect if the app is running in Standalone PWA mode on a mobile device
     const isStandaloneMode =
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone === true;
     setIsStandalone(isStandaloneMode);
 
-    // If already running as a standalone installed app on mobile, default to native_mobile navigation
     if (isStandaloneMode) {
       setNavigationMode('native_mobile');
     }
@@ -135,14 +177,12 @@ export default function App() {
     }
   };
 
-  // Hardware Back Button / Mobile System Gesture Integration (HTML5 History API)
   useEffect(() => {
     if (typeof window !== 'undefined' && window.history) {
       window.history.replaceState({ screen: 'homescreen' }, '');
     }
 
     const handlePopState = () => {
-      // If overlays are open, close them first
       if (isShadeOpen) {
         setIsShadeOpen(false);
         return;
@@ -174,7 +214,6 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [isShadeOpen, isVolumePanelOpen, isPowerMenuOpen]);
 
-  // Mobile Touch Edge-Swipe to Go Back Gesture
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
 
@@ -192,7 +231,6 @@ export default function App() {
     const deltaX = touchEndX - touchStartX;
     const deltaY = Math.abs(touchEndY - touchStartY);
 
-    // If swipe started from left edge (< 40px) and moved horizontally > 70px with low vertical movement
     if (touchStartX < 40 && deltaX > 70 && deltaY < 80) {
       handleBack();
     }
@@ -200,13 +238,11 @@ export default function App() {
     setTouchStartY(null);
   };
 
-  // Volume Levels & DND State
   const [mediaVolume, setMediaVolume] = useState(70);
   const [ringVolume, setRingVolume] = useState(85);
   const [alarmVolume, setAlarmVolume] = useState(90);
   const [isDnd, setIsDnd] = useState(false);
 
-  // Theme & Personalization (Supports 'system' | 'dark' | 'light')
   const [themeMode, setThemeMode] = useState<ThemeMode>('system');
   const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && window.matchMedia) {
@@ -216,14 +252,12 @@ export default function App() {
   });
   const [accentColor, setAccentColor] = useState<AccentColor>('slate');
 
-  // Reactively track system color scheme changes when themeMode is 'system'
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = (e: MediaQueryListEvent) => {
       setSystemPrefersDark(e.matches);
     };
-    // Sync initial value
     setSystemPrefersDark(mediaQuery.matches);
     mediaQuery.addEventListener('change', handler);
     return () => mediaQuery.removeEventListener('change', handler);
@@ -231,21 +265,13 @@ export default function App() {
 
   const isDarkMode = themeMode === 'system' ? systemPrefersDark : themeMode === 'dark';
 
-  // Notifications List
   const [notifications, setNotifications] = useState<SystemNotification[]>(INITIAL_SYSTEM_NOTIFICATIONS);
-
-  // Privacy & Sensor State
   const [privacyState, setPrivacyState] = useState<PrivacyCenterState>(INITIAL_PRIVACY_STATE);
-
-  // Installed Sandboxed Apps
   const [apps, setApps] = useState<AppSandboxInfo[]>(SAMPLE_SANDBOX_APPS);
-
-  // Network Controls
   const [isInternetOff, setIsInternetOff] = useState(false);
   const [isVpnOnlyActive, setIsVpnOnlyActive] = useState(true);
-
-  // VM Snapshots & Storage State
   const [snapshots, setSnapshots] = useState<VmSnapshot[]>(SAMPLE_SNAPSHOTS);
+
   const vmStorage: VmStorageInfo = {
     usedGb: 54.2,
     maximumGb: currentProfile.totalStorageGb,
@@ -255,7 +281,6 @@ export default function App() {
     sparseAllocationActive: true,
   };
 
-  // Real-time system clock string
   const [timeString, setTimeString] = useState('14:32');
   useEffect(() => {
     const updateTime = () => {
@@ -267,7 +292,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Capabilities & Qualitative Security Score Calculation
   const capabilities = useMemo<CapabilityItem[]>(() => {
     return getCapabilitiesForProfile(currentProfile);
   }, [currentProfile]);
@@ -276,7 +300,6 @@ export default function App() {
     return calculateSecurityScore(currentProfile);
   }, [currentProfile]);
 
-  // Navigation Handlers
   const navigateTo = (screen: SystemScreen) => {
     if (typeof window !== 'undefined' && window.history) {
       window.history.pushState({ screen }, '');
@@ -322,7 +345,6 @@ export default function App() {
     navigateTo('settings_app_detail');
   };
 
-  // Sensor Killswitch Handlers
   const handleToggleCameraKillswitch = () => {
     setPrivacyState((prev) => {
       const nextState = !prev.cameraKillSwitch;
@@ -408,7 +430,6 @@ export default function App() {
     });
   };
 
-  // App Permissions & Firewall Management
   const handleUpdateAppNetwork = (packageName: string, level: NetworkAccessLevel) => {
     setApps((prev) => prev.map((a) => (a.packageName === packageName ? { ...a, networkAccess: level } : a)));
   };
@@ -431,7 +452,6 @@ export default function App() {
     );
   };
 
-  // Snapshot Management
   const handleCreateSnapshot = (name: string) => {
     const newSnap: VmSnapshot = {
       id: `snap-${Date.now()}`,
@@ -481,7 +501,7 @@ export default function App() {
         isLockdownActive={isLockdownModeActive}
         timeString={timeString}
         isLight={isLight}
-        batteryLevel={84}
+        batteryLevel={batteryLevel}
         isVpnActive={isVpnOnlyActive}
         isDndActive={isDnd}
       />
