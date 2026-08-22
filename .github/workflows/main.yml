@@ -1,6 +1,10 @@
 name: Build SecureDroid APK
 
 on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -19,21 +23,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Install Capacitor
-        run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-
       - name: Build web application
         run: npm run build
 
-      - name: Initialize Capacitor
-        run: |
-          npx cap init SecureDroid com.securedroid.app --web-dir dist
-
-      - name: Add Android platform
-        run: npx cap add android
-
       - name: Synchronize Android project
+        # This updates the existing android/ project with your web assets
         run: npx cap sync android
 
       - name: Setup Java
@@ -44,7 +38,9 @@ jobs:
 
       - name: Build APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
