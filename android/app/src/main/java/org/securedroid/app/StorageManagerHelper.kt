@@ -6,25 +6,39 @@ import com.getcapacitor.JSObject
 import kotlin.math.round
 
 class StorageManagerHelper {
+
     fun getRealStorageState(): JSObject {
-        val statFs = StatFs(Environment.getDataDirectory().path)
-        
-        // Convert to Gigabytes
-        val bytesToGb = 1024.0 * 1024.0 * 1024.0
-        val totalGb = (statFs.blockCountLong * statFs.blockSizeLong) / bytesToGb
-        val availableGb = (statFs.availableBlocksLong * statFs.blockSizeLong) / bytesToGb
-        val usedGb = totalGb - availableGb
+        return try {
+            val statFs = StatFs(Environment.getDataDirectory().path)
 
-        val data = JSObject()
-        // Round to 2 decimal places
-        data.put("totalStorageGb", round(totalGb * 100) / 100)
-        data.put("availableStorageGb", round(availableGb * 100) / 100)
-        data.put("usedStorageGb", round(usedGb * 100) / 100)
+            val bytesToGb =
+                1024.0 * 1024.0 * 1024.0
 
-        val result = JSObject()
-        result.put("success", true)
-        result.put("data", data)
-        return result
+            val totalGb =
+                (statFs.blockCountLong * statFs.blockSizeLong) / bytesToGb
+
+            val availableGb =
+                (statFs.availableBlocksLong * statFs.blockSizeLong) / bytesToGb
+
+            val usedGb = totalGb - availableGb
+
+            JSObject().apply {
+                put("status", "ok")
+                put("data", JSObject().apply {
+                    put("totalStorageGb", round(totalGb * 100) / 100)
+                    put("availableStorageGb", round(availableGb * 100) / 100)
+                    put("usedStorageGb", round(usedGb * 100) / 100)
+                })
+            }
+        } catch (e: Exception) {
+            JSObject().apply {
+                put("status", "error")
+                put("errorCode", "UNKNOWN_ERROR")
+                put(
+                    "message",
+                    e.localizedMessage ?: "Unable to read storage state."
+                )
+            }
+        }
     }
 }
-
