@@ -100,22 +100,21 @@ export default function App() {
   const [batteryLevel, setBatteryLevel] = useState<number>(84);
   const [isCharging, setIsCharging] = useState<boolean>(false);
 
-  // Fetch real native data on boot
+  // Safely fetch real native data on boot without risk of crashing
   useEffect(() => {
     async function loadNativeData() {
       try {
-        // Fetch battery
-        const battery = await SecureDroidNative.getBatteryStatus();
-        if (battery.success && battery.data) {
+        // Safe Battery Fetch
+        const battery = await SecureDroidNative.getBatteryStatus().catch(() => null);
+        if (battery && battery.success && battery.data) {
           setBatteryLevel(battery.data.percentage);
           setIsCharging(battery.data.isCharging);
         }
 
-        // Fetch device info
-        const device = await SecureDroidNative.getDeviceInfo();
-        if (device.success && device.data) {
+        // Safe Device Info Fetch
+        const device = await SecureDroidNative.getDeviceInfo().catch(() => null);
+        if (device && device.success && device.data) {
           setRealDeviceInfo(device.data);
-          // Dynamically update the profile UI with real device specs
           setCurrentProfile((prev) => ({
             ...prev,
             manufacturer: device.data!.manufacturer,
@@ -125,12 +124,11 @@ export default function App() {
           }));
         }
       } catch (e) {
-        console.warn("Running in web browser, native plugin skipped.");
+        console.warn("Native bridge check skipped safely.");
       }
     }
     
     loadNativeData();
-    // Refresh battery every 30 seconds
     const interval = setInterval(loadNativeData, 30000);
     return () => clearInterval(interval);
   }, []);
