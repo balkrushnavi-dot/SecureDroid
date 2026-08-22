@@ -27,3 +27,14 @@ export interface RealBatteryStatus {
   percentage: number;
   isCharging: boolean;
 }
+export interface RealNetworkState {
+  isConnected: boolean;
+  networkType: 'WIFI' | 'CELLULAR' | 'ETHERNET' | 'VPN' | 'NONE';
+  isVpnActive: boolean;
+}
+
+export interface RealStorageState {
+  totalStorageGb: number;
+  availableStorageGb: number;
+  usedStorageGb: number;
+}
