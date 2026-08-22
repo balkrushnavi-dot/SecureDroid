@@ -29,4 +29,17 @@ class SecureDroidPlugin : Plugin() {
             call.resolve(err)
         }
     }
+
+    @PluginMethod
+    fun getBatteryStatus(call: PluginCall) {
+        try {
+            val res = batteryManagerHelper.getRealBatteryStatus()
+            call.resolve(res)
+        } catch (e: Exception) {
+            val err = JSObject()
+            err.put("success", false)
+            err.put("message", e.localizedMessage)
+            call.resolve(err)
+        }
+    }
 }
