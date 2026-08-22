@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.securedroid.app',
+  appId: 'org.securedroid.app',
   appName: 'SecureDroid',
   webDir: 'dist'
 };
