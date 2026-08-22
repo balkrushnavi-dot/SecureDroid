@@ -26,12 +26,29 @@ jobs:
       - name: Build web application
         run: npm run build
 
+      - name: Rebuild Android Project
+        run: |
+          # 1. Save our custom Kotlin files safely
+          mkdir -p /tmp/my_plugin
+          cp android/app/src/main/java/org/securedroid/app/*.kt /tmp/my_plugin/
+          
+          # 2. Delete the broken folder
+          rm -rf android
+          
+          # 3. Let Capacitor generate the REAL Android project with gradlew
+          npx cap add android
+          
+          # 4. Remove the default Java file Capacitor makes
+          rm -f android/app/src/main/java/org/securedroid/app/MainActivity.java
+          
+          # 5. Put our custom Kotlin files back where they belong
+          cp /tmp/my_plugin/*.kt android/app/src/main/java/org/securedroid/app/
+
       - name: Synchronize Android project
-        # This safely updates the existing android/ project instead of crashing
         run: npx cap sync android
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
