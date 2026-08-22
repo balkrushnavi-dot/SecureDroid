@@ -9,26 +9,52 @@ import com.getcapacitor.JSObject
 class BatteryManagerHelper(private val context: Context) {
 
     fun getRealBatteryStatus(): JSObject {
-        val ifilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        val batteryStatus: Intent? = context.registerReceiver(null, ifilter)
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val batteryStatus = context.registerReceiver(null, filter)
 
-        val data = JSObject()
-
-        if (batteryStatus != null) {
-            val level: Int = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-            val scale: Int = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-            val pct: Int = if (level != -1 && scale != -1) (level * 100 / scale) else -1
-            data.put("percentage", pct)
-
-            val status: Int = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                             status == BatteryManager.BATTERY_STATUS_FULL
-            data.put("isCharging", isCharging)
+        if (batteryStatus == null) {
+            return JSObject().apply {
+                put("status", "error")
+                put("errorCode", "HARDWARE_UNAVAILABLE")
+                put("message", "Android did not provide battery state.")
+            }
         }
 
-        val result = JSObject()
-        result.put("success", true)
-        result.put("data", data)
-        return result
+        val level = batteryStatus.getIntExtra(
+            BatteryManager.EXTRA_LEVEL,
+            -1
+        )
+
+        val scale = batteryStatus.getIntExtra(
+            BatteryManager.EXTRA_SCALE,
+            -1
+        )
+
+        if (level < 0 || scale <= 0) {
+            return JSObject().apply {
+                put("status", "error")
+                put("errorCode", "UNKNOWN_ERROR")
+                put("message", "Battery percentage is unavailable.")
+            }
+        }
+
+        val percentage = (level * 100) / scale
+
+        val status = batteryStatus.getIntExtra(
+            BatteryManager.EXTRA_STATUS,
+            -1
+        )
+
+        val isCharging =
+            status == BatteryManager.BATTERY_STATUS_CHARGING ||
+            status == BatteryManager.BATTERY_STATUS_FULL
+
+        return JSObject().apply {
+            put("status", "ok")
+            put("data", JSObject().apply {
+                put("percentage", percentage)
+                put("isCharging", isCharging)
+            })
+        }
     }
 }
