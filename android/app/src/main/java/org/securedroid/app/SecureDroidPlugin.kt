@@ -13,63 +13,51 @@ class SecureDroidPlugin : Plugin() {
     private lateinit var batteryManagerHelper: BatteryManagerHelper
     private lateinit var networkManagerHelper: NetworkManagerHelper
     private lateinit var storageManagerHelper: StorageManagerHelper
+    private lateinit var sensorManagerHelper: SensorManagerHelper
+    private lateinit var biometricManagerHelper: BiometricManagerHelper
 
     override fun load() {
         deviceInfoManager = DeviceInfoManager(context)
         batteryManagerHelper = BatteryManagerHelper(context)
         networkManagerHelper = NetworkManagerHelper(context)
         storageManagerHelper = StorageManagerHelper()
+        sensorManagerHelper = SensorManagerHelper(context)
+        biometricManagerHelper = BiometricManagerHelper(context)
     }
 
     @PluginMethod
     fun getDeviceInfo(call: PluginCall) {
-        try {
-            val res = deviceInfoManager.getRealDeviceInfo()
-            call.resolve(res)
-        } catch (e: Exception) {
-            val err = JSObject()
-            err.put("success", false)
-            err.put("message", e.localizedMessage)
-            call.resolve(err)
-        }
+        try { call.resolve(deviceInfoManager.getRealDeviceInfo()) } 
+        catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
     }
 
     @PluginMethod
     fun getBatteryStatus(call: PluginCall) {
-        try {
-            val res = batteryManagerHelper.getRealBatteryStatus()
-            call.resolve(res)
-        } catch (e: Exception) {
-            val err = JSObject()
-            err.put("success", false)
-            err.put("message", e.localizedMessage)
-            call.resolve(err)
-        }
+        try { call.resolve(batteryManagerHelper.getRealBatteryStatus()) } 
+        catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
     }
 
     @PluginMethod
     fun getNetworkState(call: PluginCall) {
-        try {
-            val res = networkManagerHelper.getRealNetworkState()
-            call.resolve(res)
-        } catch (e: Exception) {
-            val err = JSObject()
-            err.put("success", false)
-            err.put("message", e.localizedMessage)
-            call.resolve(err)
-        }
+        try { call.resolve(networkManagerHelper.getRealNetworkState()) } 
+        catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
     }
 
     @PluginMethod
     fun getStorageState(call: PluginCall) {
-        try {
-            val res = storageManagerHelper.getRealStorageState()
-            call.resolve(res)
-        } catch (e: Exception) {
-            val err = JSObject()
-            err.put("success", false)
-            err.put("message", e.localizedMessage)
-            call.resolve(err)
-        }
+        try { call.resolve(storageManagerHelper.getRealStorageState()) } 
+        catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
+    }
+
+    @PluginMethod
+    fun getAvailableSensors(call: PluginCall) {
+        try { call.resolve(sensorManagerHelper.getAvailableSensors()) } 
+        catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
+    }
+
+    @PluginMethod
+    fun getBiometricStatus(call: PluginCall) {
+        try { call.resolve(biometricManagerHelper.getBiometricStatus()) } 
+        catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
     }
 }
