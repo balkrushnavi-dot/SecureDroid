@@ -10,30 +10,66 @@ import com.getcapacitor.JSObject
 class PermissionManagerHelper(private val context: Context) {
 
     private fun isGranted(permission: String): Boolean {
-        return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat.checkSelfPermission(
+            context,
+            permission
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     fun getAppPermissionStatus(): JSObject {
-        val permissions = JSObject()
+        return try {
+            val permissions = JSObject().apply {
+                put(
+                    "camera",
+                    isGranted(Manifest.permission.CAMERA)
+                )
 
-        permissions.put("camera", isGranted(Manifest.permission.CAMERA))
-        permissions.put("microphone", isGranted(Manifest.permission.RECORD_AUDIO))
-        permissions.put("location", isGranted(Manifest.permission.ACCESS_FINE_LOCATION) || isGranted(Manifest.permission.ACCESS_COARSE_LOCATION))
-        permissions.put("contacts", isGranted(Manifest.permission.READ_CONTACTS))
-        permissions.put("calendar", isGranted(Manifest.permission.READ_CALENDAR))
+                put(
+                    "microphone",
+                    isGranted(Manifest.permission.RECORD_AUDIO)
+                )
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.put("notifications", isGranted(Manifest.permission.POST_NOTIFICATIONS))
-        } else {
-            permissions.put("notifications", true)
+                put(
+                    "location",
+                    isGranted(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                    isGranted(Manifest.permission.ACCESS_COARSE_LOCATION)
+                )
+
+                put(
+                    "contacts",
+                    isGranted(Manifest.permission.READ_CONTACTS)
+                )
+
+                put(
+                    "calendar",
+                    isGranted(Manifest.permission.READ_CALENDAR)
+                )
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    put(
+                        "notifications",
+                        isGranted(Manifest.permission.POST_NOTIFICATIONS)
+                    )
+                } else {
+                    put("notifications", true)
+                }
+            }
+
+            JSObject().apply {
+                put("status", "ok")
+                put("data", JSObject().apply {
+                    put("permissions", permissions)
+                })
+            }
+        } catch (e: Exception) {
+            JSObject().apply {
+                put("status", "error")
+                put("errorCode", "UNKNOWN_ERROR")
+                put(
+                    "message",
+                    e.localizedMessage ?: "Unable to inspect permissions."
+                )
+            }
         }
-
-        val data = JSObject()
-        data.put("permissions", permissions)
-
-        val result = JSObject()
-        result.put("success", true)
-        result.put("data", data)
-        return result
     }
 }
