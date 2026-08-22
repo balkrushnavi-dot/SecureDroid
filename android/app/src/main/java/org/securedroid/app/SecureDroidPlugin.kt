@@ -15,6 +15,8 @@ class SecureDroidPlugin : Plugin() {
     private lateinit var storageManagerHelper: StorageManagerHelper
     private lateinit var sensorManagerHelper: SensorManagerHelper
     private lateinit var biometricManagerHelper: BiometricManagerHelper
+    private lateinit var cameraManagerHelper: CameraManagerHelper
+    private lateinit var permissionManagerHelper: PermissionManagerHelper
 
     override fun load() {
         deviceInfoManager = DeviceInfoManager(context)
@@ -23,6 +25,8 @@ class SecureDroidPlugin : Plugin() {
         storageManagerHelper = StorageManagerHelper()
         sensorManagerHelper = SensorManagerHelper(context)
         biometricManagerHelper = BiometricManagerHelper(context)
+        cameraManagerHelper = CameraManagerHelper(context)
+        permissionManagerHelper = PermissionManagerHelper(context)
     }
 
     @PluginMethod
@@ -58,6 +62,18 @@ class SecureDroidPlugin : Plugin() {
     @PluginMethod
     fun getBiometricStatus(call: PluginCall) {
         try { call.resolve(biometricManagerHelper.getBiometricStatus()) } 
+        catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
+    }
+
+    @PluginMethod
+    fun getCameraStatus(call: PluginCall) {
+        try { call.resolve(cameraManagerHelper.getCameraStatus()) } 
+        catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
+    }
+
+    @PluginMethod
+    fun getAppPermissions(call: PluginCall) {
+        try { call.resolve(permissionManagerHelper.getAppPermissionStatus()) } 
         catch (e: Exception) { call.resolve(JSObject().put("success", false).put("message", e.localizedMessage)) }
     }
 }
