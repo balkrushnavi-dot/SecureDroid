@@ -11,10 +11,14 @@ class SecureDroidPlugin : Plugin() {
 
     private lateinit var deviceInfoManager: DeviceInfoManager
     private lateinit var batteryManagerHelper: BatteryManagerHelper
+    private lateinit var networkManagerHelper: NetworkManagerHelper
+    private lateinit var storageManagerHelper: StorageManagerHelper
 
     override fun load() {
         deviceInfoManager = DeviceInfoManager(context)
         batteryManagerHelper = BatteryManagerHelper(context)
+        networkManagerHelper = NetworkManagerHelper(context)
+        storageManagerHelper = StorageManagerHelper()
     }
 
     @PluginMethod
@@ -34,6 +38,32 @@ class SecureDroidPlugin : Plugin() {
     fun getBatteryStatus(call: PluginCall) {
         try {
             val res = batteryManagerHelper.getRealBatteryStatus()
+            call.resolve(res)
+        } catch (e: Exception) {
+            val err = JSObject()
+            err.put("success", false)
+            err.put("message", e.localizedMessage)
+            call.resolve(err)
+        }
+    }
+
+    @PluginMethod
+    fun getNetworkState(call: PluginCall) {
+        try {
+            val res = networkManagerHelper.getRealNetworkState()
+            call.resolve(res)
+        } catch (e: Exception) {
+            val err = JSObject()
+            err.put("success", false)
+            err.put("message", e.localizedMessage)
+            call.resolve(err)
+        }
+    }
+
+    @PluginMethod
+    fun getStorageState(call: PluginCall) {
+        try {
+            val res = storageManagerHelper.getRealStorageState()
             call.resolve(res)
         } catch (e: Exception) {
             val err = JSObject()
