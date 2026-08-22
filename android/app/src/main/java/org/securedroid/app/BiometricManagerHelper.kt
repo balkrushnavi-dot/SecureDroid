@@ -6,26 +6,62 @@ import android.content.pm.PackageManager
 import com.getcapacitor.JSObject
 
 class BiometricManagerHelper(private val context: Context) {
+
     fun getBiometricStatus(): JSObject {
-        val packageManager = context.packageManager
-        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        return try {
+            val packageManager = context.packageManager
 
-        val hasFingerprint = packageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)
-        val hasFace = packageManager.hasSystemFeature(PackageManager.FEATURE_FACE)
-        val isDeviceSecure = keyguardManager.isDeviceSecure
+            val keyguardManager =
+                context.getSystemService(Context.KEYGUARD_SERVICE)
+                    as? KeyguardManager
+                    ?: return JSObject().apply {
+                        put("status", "unsupported")
+                        put("errorCode", "NOT_SUPPORTED")
+                        put("message", "KeyguardManager is unavailable.")
+                    }
 
-        var biometricType = "NONE"
-        if (hasFace) biometricType = "FACE"
-        else if (hasFingerprint) biometricType = "FINGERPRINT"
+            val hasFingerprint =
+                packageManager.hasSystemFeature(
+                    PackageManager.FEATURE_FINGERPRINT
+                )
 
-        val data = JSObject()
-        data.put("isBiometricsAvailable", hasFingerprint || hasFace)
-        data.put("biometricType", biometricType)
-        data.put("isSecureLockScreenConfigured", isDeviceSecure)
+            val hasFace =
+                packageManager.hasSystemFeature(
+                    PackageManager.FEATURE_FACE
+                )
 
-        val result = JSObject()
-        result.put("success", true)
-        result.put("data", data)
-        return result
+            val isDeviceSecure =
+                keyguardManager.isDeviceSecure
+
+            val biometricType = when {
+                hasFace -> "FACE"
+                hasFingerprint -> "FINGERPRINT"
+                else -> "NONE"
+            }
+
+            JSObject().apply {
+                put("status", "ok")
+                put("data", JSObject().apply {
+                    put(
+                        "isBiometricsAvailable",
+                        hasFingerprint || hasFace
+                    )
+                    put("biometricType", biometricType)
+                    put(
+                        "isSecureLockScreenConfigured",
+                        isDeviceSecure
+                    )
+                })
+            }
+        } catch (e: Exception) {
+            JSObject().apply {
+                put("status", "error")
+                put("errorCode", "UNKNOWN_ERROR")
+                put(
+                    "message",
+                    e.localizedMessage ?: "Unable to query biometric state."
+                )
+            }
+        }
     }
 }
