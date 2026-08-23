@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
   return {
+    root: path.resolve(__dirname, 'src'), // Explicitly sets root to src where index.html resides
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
@@ -12,17 +13,16 @@ export default defineConfig(() => {
       },
     },
     build: {
+      outDir: '../dist', // Outputs build back to project root dist
+      emptyOutDir: true,
       rollupOptions: {
         input: {
-          main: path.resolve(__dirname, 'index.html'),
+          main: path.resolve(__dirname, 'src/index.html'),
         },
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };
